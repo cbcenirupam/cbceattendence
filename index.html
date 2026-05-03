@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CBCE INSTITUTE Smart Attendance System v5.0 Final</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cbce: {
+                            dark: '#4C5C2D',
+                            green: '#6A7E3F',
+                            light: '#FBF6F6',
+                            accent: '#FF9644',
+                            bg: '#0c0f0a',
+                            panel: '#13180f'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        mono: ['Inter', 'monospace']
+                    },
+                    animation: {
+                        'float': 'float 5s ease-in-out infinite',
+                        'pop': 'pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+                    },
+                    keyframes: {
+                        float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-10px)' } },
+                        pop: { '0%': { transform: 'scale(0.9)', opacity: 0 }, '100%': { transform: 'scale(1)', opacity: 1 } },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- External Libraries (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    
+    <!-- PDF Generation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- Internal CSS -->
+    <style>
+        :root { --primary: #4C5C2D; --secondary: #6A7E3F; --light: #FBF6F6; --accent: #FF9644; }
+        
+        body {
+            background-color: theme('colors.cbce.bg');
+            color: var(--light); overflow: hidden; 
+            user-select: none; -webkit-user-select: none;
+        }
+
+        /* Clean Glassmorphism */
+        .glass {
+            background: rgba(19, 24, 15, 0.85);
+            backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+            border: 1px solid rgba(106, 126, 63, 0.2);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+        
+        .glass-panel {
+            background: rgba(14, 18, 11, 0.9);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(106, 126, 63, 0.15);
+        }
+
+        /* Form Inputs */
+        .input-group { position: relative; margin-top: 1.5rem; }
+        .input-group input, .input-group select {
+            width: 100%; padding: 1.2rem 1rem 1.2rem 3.5rem;
+            background: rgba(0,0,0,0.5); border: 1px solid #2a3320;
+            border-radius: 1rem; color: #fff; outline: none; transition: all 0.3s;
+            font-size: 1rem; font-weight: 500;
+        }
+        .input-group input:focus, .input-group select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(255,150,68,0.15); background: rgba(0,0,0,0.8); }
+        .input-group label {
+            position: absolute; left: 3.5rem; top: 1.2rem; color: #888;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); pointer-events: none; font-weight: 500;
+        }
+        .input-group input:focus ~ label, .input-group input:not(:placeholder-shown) ~ label, .input-group select:focus ~ label, .input-group select:not([value=""]) ~ label {
+            transform: translateY(-1.9rem) scale(0.85); left: 1rem; color: var(--accent); font-weight: 700;
+        }
+        .input-group .icon { position: absolute; left: 1.3rem; top: 1.3rem; color: #666; font-size: 1.4rem; transition: color 0.3s; }
+        .input-group input:focus ~ .icon, .input-group select:focus ~ .icon { color: var(--accent); }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(106, 126, 63, 0.6); border-radius: 10px; border: 2px solid theme('colors.cbce.bg'); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--secondary); }
+
+        /* Professional AR Scanner UI */
+        .ar-scanner-box {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 340px; height: 340px; z-index: 10;
+            box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.9); 
+            transition: all 0.3s ease; border-radius: 20px;
+        }
+        .ar-scanner-box.active { box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.75), inset 0 0 40px rgba(106, 126, 63, 0.5); }
+        .ar-corner { position: absolute; width: 60px; height: 60px; border-color: var(--accent); border-style: solid; z-index: 11; transition: all 0.3s; }
+        .ar-scanner-box.active .ar-corner { border-color: var(--secondary); transform: scale(1.05); }
+        
+        .ar-tl { top: -4px; left: -4px; border-width: 6px 0 0 6px; border-top-left-radius: 20px; }
+        .ar-tr { top: -4px; right: -4px; border-width: 6px 6px 0 0; border-top-right-radius: 20px; }
+        .ar-bl { bottom: -4px; left: -4px; border-width: 0 0 6px 6px; border-bottom-left-radius: 20px; }
+        .ar-br { bottom: -4px; right: -4px; border-width: 0 6px 6px 0; border-bottom-right-radius: 20px; }
+
+        /* 1-Second Hold Progress Bar */
+        .scan-progress-container {
+            position: absolute; bottom: -30px; left: 10%; width: 80%; height: 6px;
+            background: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .scan-progress-container.show { opacity: 1; }
+        .scan-progress-bar {
+            height: 100%; width: 0%; background: var(--secondary);
+            box-shadow: 0 0 10px var(--secondary); transition: width 0.1s linear;
+        }
+
+        /* Video Feed */
+        #video-container { position: relative; width: 100%; height: 100%; overflow: hidden; background: #000; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        canvas#overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 5; transform: scaleX(-1); }
+        
+        .fade-enter { opacity: 0; transform: scale(0.97); }
+        .fade-enter-active { opacity: 1; transform: scale(1); transition: all 0.4s cubic-bezier(0.2, 0, 0, 1); }
+        :fullscreen { background-color: theme('colors.cbce.bg'); }
+        
+        tr.new-entry { animation: pop 0.5s ease-out forwards; background-color: rgba(106, 126, 63, 0.2); }
+        
+        /* Radio Button Styling */
+        .role-radio:checked + div { background: rgba(106, 126, 63, 0.2); border-color: var(--secondary); }
+        .role-radio:checked + div .radio-dot { background: var(--secondary); box-shadow: 0 0 8px var(--secondary); }
+    </style>
+</head>
+<body class="h-screen w-screen flex items-center justify-center relative font-sans text-gray-200">
+
+    <!-- Ambient Institution Background -->
+    <div class="absolute inset-0 z-[-1] overflow-hidden">
+        <div class="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-cbce-primary rounded-full mix-blend-screen filter blur-[200px] opacity-20 animate-float"></div>
+        <div class="absolute bottom-[-20%] right-[-10%] w-[700px] h-[700px] bg-cbce-accent rounded-full mix-blend-screen filter blur-[200px] opacity-10 animate-float" style="animation-delay: 2s;"></div>
+    </div>
+
+    <div id="toast-container" class="fixed top-6 right-6 z-[9999] flex flex-col gap-3"></div>
+
+    <!-- ==========================================
+         VIEW 1: MASTER LOGIN SYSTEM
+         ========================================== -->
+    <div id="view-login" class="glass rounded-[2rem] p-10 w-full max-w-[480px] mx-4 shadow-2xl transition-all duration-500 border-t border-l border-white/10 relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-cbce-dark via-cbce-accent to-cbce-green"></div>
+        
+        <div class="text-center mb-8">
+            <div class="w-24 h-24 bg-gradient-to-br from-[#1a2013] to-black rounded-3xl mx-auto mb-5 flex items-center justify-center border border-cbce-green/50 shadow-inner">
+                <i class="ph ph-buildings text-5xl text-cbce-accent"></i>
+            </div>
+            <h1 class="text-3xl font-black text-white tracking-tight mb-1">CBCE <span class="text-cbce-green font-light">INSTITUTE</span></h1>
+            <p class="text-sm text-gray-400 font-medium">Smart Attendance Platform v5.0</p>
+        </div>
+
+        <form id="login-form" class="space-y-5">
+            <div class="input-group mt-0">
+                <input type="text" id="login-user" placeholder=" " autocomplete="off" required>
+                <label>Username</label>
+                <i class="ph ph-user icon"></i>
+            </div>
+            
+            <div class="input-group mt-0">
+                <input type="password" id="login-pass" placeholder=" " required>
+                <label>Password</label>
+                <i class="ph ph-lock-key icon"></i>
+                <button type="button" onclick="ui.togglePassword()" class="absolute right-5 top-[1.2rem] text-gray-500 hover:text-white transition-colors">
+                    <i class="ph ph-eye text-xl" id="eye-icon"></i>
+                </button>
+            </div>
+
+            <div class="pt-2">
+                <p class="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3">Select System Role</p>
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="cursor-pointer relative">
+                        <input type="radio" name="loginRole" value="dashboard" class="role-radio absolute opacity-0" checked>
+                        <div class="bg-black/40 border border-gray-700 rounded-xl p-4 flex flex-col items-center gap-2 transition-all">
+                            <div class="w-4 h-4 rounded-full border-2 border-gray-500 flex items-center justify-center mb-1"><div class="radio-dot w-2 h-2 rounded-full transition-all"></div></div>
+                            <i class="ph ph-desktop text-2xl text-white"></i>
+                            <span class="text-xs font-bold text-white">Dashboard</span>
+                        </div>
+                    </label>
+                    <label class="cursor-pointer relative">
+                        <input type="radio" name="loginRole" value="scanner" class="role-radio absolute opacity-0">
+                        <div class="bg-black/40 border border-gray-700 rounded-xl p-4 flex flex-col items-center gap-2 transition-all">
+                            <div class="w-4 h-4 rounded-full border-2 border-gray-500 flex items-center justify-center mb-1"><div class="radio-dot w-2 h-2 rounded-full transition-all"></div></div>
+                            <i class="ph ph-camera text-2xl text-white"></i>
+                            <span class="text-xs font-bold text-white">Scanner</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-cbce-green hover:bg-cbce-dark text-white font-bold py-4 rounded-xl transition-all shadow-lg mt-8 flex items-center justify-center gap-2 text-base">
+                Secure Login <i class="ph ph-sign-in text-xl"></i>
+            </button>
+        </form>
+        
+        <div class="mt-8 text-center">
+            <p class="text-[10px] text-gray-600 uppercase font-bold tracking-widest">Global P2P Synchronized Network</p>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 2: ATTENDANCE DASHBOARD (MASTER/BRANCH)
+         ========================================== -->
+    <div id="view-dashboard" class="hidden w-full h-full flex flex-col md:flex-row bg-[#080a07]">
+        
+        <!-- Sidebar Navigation -->
+        <div class="w-full md:w-[280px] glass-panel border-r border-gray-800/80 flex flex-col z-20 shadow-2xl relative">
+            <div class="p-6 border-b border-gray-800/80 flex items-center gap-4 bg-black/40">
+                <div class="w-12 h-12 bg-gradient-to-br from-cbce-dark to-black rounded-xl flex items-center justify-center border border-cbce-green/60 shadow-inner">
+                    <i class="ph ph-buildings text-2xl text-white"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-white leading-tight text-lg" id="sidebar-title">CBCE Admin</h2>
+                    <div class="text-[10px] text-cbce-green flex items-center gap-1.5 mt-1 font-bold uppercase tracking-wider">
+                        <span class="w-2 h-2 rounded-full bg-cbce-green animate-pulse"></span> <span id="sidebar-role">Monitoring Active</span>
+                    </div>
+                </div>
+            </div>
+            
+            <nav class="flex-1 p-5 space-y-2 overflow-y-auto">
+                <div class="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2 ml-2 mt-2">Main Menu</div>
+                <button onclick="ui.switchTab('tab-live')" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl bg-cbce-green/20 text-white border border-cbce-green/40 transition-all tab-btn font-medium" data-target="tab-live">
+                    <i class="ph ph-activity text-xl text-cbce-green"></i> Live Attendance
+                </button>
+                <button onclick="ui.switchTab('tab-students')" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl hover:bg-gray-800/60 text-gray-400 hover:text-white transition-all tab-btn font-medium" data-target="tab-students">
+                    <i class="ph ph-users text-xl"></i> Registered Profiles
+                </button>
+                <button onclick="ui.switchTab('tab-export')" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl hover:bg-gray-800/60 text-gray-400 hover:text-white transition-all tab-btn font-medium" data-target="tab-export">
+                    <i class="ph ph-file-pdf text-xl"></i> Export Reports
+                </button>
+                
+                <div id="nav-admin-tools" class="hidden">
+                    <div class="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-6 mb-2 ml-2">Super Admin Tools</div>
+                    <button onclick="ui.switchTab('tab-setup')" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl hover:bg-gray-800/60 text-gray-400 hover:text-white transition-all tab-btn font-medium" data-target="tab-setup">
+                        <i class="ph ph-cloud-arrow-up text-xl"></i> Database Sync Setup
+                    </button>
+                </div>
+            </nav>
+
+            <div class="p-5 border-t border-gray-800/80 bg-black/60">
+                <div class="text-center mb-3">
+                    <p class="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-1">Network Synchronization</p>
+                    <div class="inline-flex items-center gap-2 px-3 py-1 bg-black rounded-lg border border-gray-700 text-xs text-gray-300 font-mono" id="network-sync-status">
+                        <i class="ph ph-plugs text-cbce-accent"></i> Connecting P2P...
+                    </div>
+                </div>
+                <button onclick="app.logout()" class="w-full flex items-center justify-center gap-2 bg-red-950/40 text-red-400 hover:bg-red-900/60 hover:text-white py-3 rounded-xl border border-red-900/50 transition-all text-sm font-bold shadow-lg">
+                    <i class="ph ph-sign-out text-lg"></i> Logout
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div class="flex-1 flex flex-col h-full overflow-hidden relative">
+            <header class="h-20 border-b border-gray-800/80 flex items-center justify-between px-8 bg-black/40 backdrop-blur-xl z-10 shadow-sm">
+                <div class="flex items-center gap-6">
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Attendance <span class="text-cbce-green font-light">Overview</span></h2>
+                    
+                    <!-- Admin Branch Filter -->
+                    <div id="admin-branch-filter" class="hidden items-center bg-black/60 rounded-lg border border-gray-700 p-1">
+                        <button onclick="ui.filterBranch('All')" class="px-4 py-1.5 text-xs font-bold uppercase rounded-md bg-cbce-dark text-white branch-filter-btn" data-branch="All">All Branches</button>
+                        <button onclick="ui.filterBranch('Silchar')" class="px-4 py-1.5 text-xs font-bold uppercase rounded-md text-gray-500 hover:text-white branch-filter-btn transition-colors" data-branch="Silchar">Silchar</button>
+                        <button onclick="ui.filterBranch('Kailashahar')" class="px-4 py-1.5 text-xs font-bold uppercase rounded-md text-gray-500 hover:text-white branch-filter-btn transition-colors" data-branch="Kailashahar">Kailashahar</button>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <div id="offline-queue-badge" class="hidden items-center gap-2 text-xs font-bold bg-orange-950/60 text-orange-400 px-4 py-1.5 rounded-lg border border-orange-800">
+                        <i class="ph ph-arrows-clockwise animate-spin text-sm"></i> <span id="queue-count">0</span> Pending Sync
+                    </div>
+                    <div class="flex items-center gap-2 text-sm bg-black/80 px-4 py-2 rounded-xl border border-gray-800">
+                        <i class="ph ph-clock text-cbce-accent text-lg"></i>
+                        <span id="live-clock" class="font-mono text-gray-200 font-medium">00:00:00</span>
+                    </div>
+                    <button onclick="ui.toggleFullscreen()" class="text-gray-400 hover:text-white transition-colors p-2.5 bg-black/60 hover:bg-gray-800 border border-gray-700 rounded-xl">
+                        <i class="ph ph-corners-out text-lg"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-8 scroll-smooth relative">
+                
+                <!-- TAB: LIVE ATTENDANCE -->
+                <div id="tab-live" class="tab-content block space-y-8 max-w-[1500px] mx-auto">
+                    
+                    <!-- LIVE FACE COMPARISON PANEL -->
+                    <div id="live-comparison-panel" class="hidden animate-pop">
+                        <div class="glass-panel p-6 rounded-[2rem] border border-cbce-green/30 shadow-lg relative overflow-hidden bg-gradient-to-br from-[#11160d] to-black">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-cbce-green"></div>
+                            
+                            <div class="flex flex-col lg:flex-row items-center justify-between gap-8">
+                                <div class="flex-1 w-full">
+                                    <div class="flex items-center justify-between mb-4">
+                                        <div class="flex items-center gap-2">
+                                            <i class="ph ph-scan text-cbce-green text-xl animate-pulse"></i>
+                                            <h3 class="text-lg font-bold text-white uppercase tracking-wider">Latest Scan Verification</h3>
+                                        </div>
+                                        <span id="compare-branch-badge" class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider border border-gray-700 bg-black rounded-lg text-gray-300">BRANCH</span>
+                                    </div>
+                                    
+                                    <div class="flex gap-6 justify-center lg:justify-start items-center">
+                                        <!-- Stored Profile -->
+                                        <div class="text-center relative">
+                                            <div class="w-32 h-32 rounded-2xl overflow-hidden border-[3px] border-gray-700 bg-black shadow-lg">
+                                                <img id="compare-stored-img" src="" class="w-full h-full object-cover">
+                                            </div>
+                                            <div class="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-600 text-[9px] text-white px-3 py-1 rounded-full font-bold uppercase whitespace-nowrap">Registered Photo</div>
+                                        </div>
+                                        
+                                        <!-- Accuracy Match -->
+                                        <div class="flex flex-col justify-center items-center w-24">
+                                            <div class="text-cbce-green font-black text-2xl" id="compare-conf-text">98%</div>
+                                            <div class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-1">Accuracy Match</div>
+                                            <div class="flex gap-1 mt-2">
+                                                <div class="w-1.5 h-1.5 rounded-full bg-cbce-green animate-pulse"></div>
+                                                <div class="w-1.5 h-1.5 rounded-full bg-cbce-green animate-pulse" style="animation-delay: 0.1s"></div>
+                                                <div class="w-1.5 h-1.5 rounded-full bg-cbce-green animate-pulse" style="animation-delay: 0.2s"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Live Scan -->
+                                        <div class="text-center relative">
+                                            <div class="w-32 h-32 rounded-2xl overflow-hidden border-[3px] border-cbce-green bg-black shadow-[0_0_15px_rgba(106,126,63,0.3)]">
+                                                <img id="compare-live-img" src="" class="w-full h-full object-cover">
+                                            </div>
+                                            <div class="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-cbce-green border border-[#899f57] text-[9px] text-white px-3 py-1 rounded-full font-bold uppercase whitespace-nowrap">Live Capture</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex-1 bg-black/50 p-6 rounded-[1.5rem] border border-gray-800 w-full">
+                                    <div class="flex justify-between items-start mb-4 border-b border-gray-800 pb-4">
+                                        <div>
+                                            <h4 id="compare-name" class="text-2xl font-bold text-white mb-1">Student Name</h4>
+                                            <span id="compare-role" class="inline-block px-2 py-0.5 bg-gray-900 border border-gray-700 text-[10px] text-cbce-accent font-bold rounded uppercase">Role • ID</span>
+                                        </div>
+                                        <div class="text-right">
+                                            <div id="compare-status" class="text-xl font-black text-cbce-green uppercase tracking-wider">ARRIVAL</div>
+                                            <p id="compare-time" class="text-xs text-gray-400 font-mono mt-1 font-bold">00:00 AM</p>
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="bg-[#0a0d08] p-3 rounded-xl border border-gray-800">
+                                            <p class="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-1">Course / Dept</p>
+                                            <p id="compare-dept" class="text-sm font-bold text-white truncate">Value</p>
+                                        </div>
+                                        <div class="bg-[#0a0d08] p-3 rounded-xl border border-gray-800">
+                                            <p class="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-1">Scan Method</p>
+                                            <p class="text-sm font-bold text-gray-300"><i class="ph ph-bounding-box text-cbce-accent"></i> Face Recognition</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- OVERVIEW CARDS -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="glass-panel p-6 rounded-[1.5rem] border border-gray-800 flex items-center justify-between">
+                            <div>
+                                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Total Attendance Today</p>
+                                <h3 class="text-4xl font-bold text-white" id="stat-logs-today">0</h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-black border border-gray-700 flex items-center justify-center text-cbce-accent"><i class="ph ph-list-numbers text-2xl"></i></div>
+                        </div>
+                        <div class="glass-panel p-6 rounded-[1.5rem] border border-gray-800 flex items-center justify-between bg-gradient-to-br from-[#11160d] to-black">
+                            <div>
+                                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Active Inside Campus</p>
+                                <h3 class="text-4xl font-bold text-white" id="stat-present">0</h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-cbce-green/20 border border-cbce-green/40 flex items-center justify-center text-cbce-green"><i class="ph ph-buildings text-2xl"></i></div>
+                        </div>
+                        <div class="glass-panel p-6 rounded-[1.5rem] border border-gray-800 flex items-center justify-between">
+                            <div>
+                                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Total Registered Users</p>
+                                <h3 class="text-4xl font-bold text-gray-300" id="stat-total-users">0</h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-black border border-gray-700 flex items-center justify-center text-gray-400"><i class="ph ph-users text-2xl"></i></div>
+                        </div>
+                        <div class="glass-panel p-6 rounded-[1.5rem] border border-gray-800 flex items-center justify-between">
+                            <div>
+                                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Active Scanners</p>
+                                <h3 class="text-4xl font-bold text-blue-400" id="stat-scanners">1</h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-blue-900/20 border border-blue-900/50 flex items-center justify-center text-blue-400"><i class="ph ph-webcam text-2xl"></i></div>
+                        </div>
+                    </div>
+
+                    <!-- ATTENDANCE TABLE -->
+                    <div class="glass-panel rounded-[2rem] border border-gray-800 overflow-hidden shadow-xl">
+                        <div class="p-6 border-b border-gray-800/80 flex flex-wrap justify-between items-center bg-black/40 gap-4">
+                            <h3 class="font-bold text-white flex items-center gap-3 text-xl"><i class="ph ph-table text-cbce-green"></i> Live Attendance Feed</h3>
+                            <div class="px-3 py-1.5 bg-black border border-gray-700 rounded-lg text-xs font-bold text-gray-400" id="log-count">0 Records Found</div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-gray-300">
+                                <thead class="bg-[#050604] text-[10px] uppercase text-gray-500 font-bold tracking-widest border-b border-gray-800">
+                                    <tr>
+                                        <th class="px-8 py-5">Profile</th>
+                                        <th class="px-6 py-5">Branch</th>
+                                        <th class="px-6 py-5">Attendance</th>
+                                        <th class="px-6 py-5">Time & Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="live-table-body" class="divide-y divide-gray-800/60 bg-black/20">
+                                    <tr id="empty-log-row"><td colspan="4" class="px-8 py-16 text-center text-gray-600 font-medium text-base border-b border-transparent">No attendance records found for this view.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: REGISTERED PROFILES -->
+                <div id="tab-students" class="tab-content hidden space-y-6 max-w-[1500px] mx-auto">
+                    <div class="glass-panel rounded-[2rem] border border-gray-800 overflow-hidden shadow-xl">
+                        <div class="p-6 border-b border-gray-800/80 bg-black/40 flex justify-between items-center flex-wrap gap-4">
+                            <h3 class="font-bold text-white flex items-center gap-3 text-xl"><i class="ph ph-address-book text-cbce-green"></i> Registered Profiles</h3>
+                            
+                            <!-- Search -->
+                            <div class="relative w-full max-w-sm">
+                                <i class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-lg"></i>
+                                <input type="text" id="search-vault" onkeyup="ui.filterVault()" placeholder="Search Name, ID, or Course..." class="w-full bg-black/60 border border-gray-700 rounded-xl py-2.5 px-11 text-sm text-white focus:border-cbce-green outline-none transition-colors">
+                            </div>
+                        </div>
+                        <div class="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="students-grid">
+                            <!-- Injected via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: EXPORT REPORTS -->
+                <div id="tab-export" class="tab-content hidden space-y-6">
+                    <div class="glass-panel p-10 rounded-[2rem] border border-gray-800 shadow-xl max-w-4xl mx-auto">
+                        <div class="text-center mb-10 relative">
+                            <div class="w-20 h-20 bg-gradient-to-br from-gray-900 to-black rounded-[1.2rem] mx-auto mb-5 flex items-center justify-center border border-gray-700 shadow-inner">
+                                <i class="ph ph-file-pdf text-4xl text-red-500"></i>
+                            </div>
+                            <h2 class="text-3xl font-bold text-white">Generate Reports</h2>
+                            <p class="text-gray-400 mt-2 text-sm">Export professional A4 PDF attendance sheets for official records.</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div class="bg-black/50 p-6 rounded-2xl border border-gray-700 hover:border-gray-500 transition-colors shadow-sm">
+                                <h4 class="text-white font-bold mb-2 flex items-center gap-2 text-lg"><i class="ph ph-calendar-check text-cbce-green"></i> Daily Attendance Log</h4>
+                                <p class="text-xs text-gray-400 mb-6">Complete record of all arrivals and departures for today across the selected branch.</p>
+                                <button onclick="app.generatePDF('Daily Attendance Report')" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3.5 rounded-xl border border-gray-600 transition-colors text-sm flex items-center justify-center gap-2">
+                                    <i class="ph ph-download-simple"></i> Download PDF
+                                </button>
+                            </div>
+                            
+                            <div class="bg-black/50 p-6 rounded-2xl border border-gray-700 hover:border-gray-500 transition-colors shadow-sm">
+                                <h4 class="text-white font-bold mb-2 flex items-center gap-2 text-lg"><i class="ph ph-users text-cbce-accent"></i> Current Campus Status</h4>
+                                <p class="text-xs text-gray-400 mb-6">Live snapshot of everyone currently inside the facility (Arrivals without Departures).</p>
+                                <button onclick="app.generatePDF('Active Campus Status Report')" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3.5 rounded-xl border border-gray-600 transition-colors text-sm flex items-center justify-center gap-2">
+                                    <i class="ph ph-download-simple"></i> Download PDF
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="pt-6 border-t border-gray-800/80 text-center">
+                            <p class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-3">Spreadsheet Export</p>
+                            <button onclick="app.exportCSV()" class="mx-auto bg-black text-gray-300 hover:text-white px-6 py-3 rounded-xl border border-gray-700 hover:border-gray-500 transition-colors text-sm font-bold flex items-center gap-2">
+                                <i class="ph ph-file-csv text-xl"></i> Download Master Excel/CSV
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: CLOUD SETUP (SUPER ADMIN ONLY) -->
+                <div id="tab-setup" class="tab-content hidden space-y-6">
+                    <div class="glass-panel p-10 rounded-[2rem] border border-gray-800 shadow-xl max-w-4xl mx-auto">
+                        <div class="flex items-center gap-6 mb-8">
+                            <div class="w-16 h-16 bg-gradient-to-br from-gray-800 to-black rounded-2xl flex items-center justify-center text-gray-300 border border-gray-700 shadow-inner">
+                                <i class="ph ph-google-logo text-3xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-2xl text-white">Google Sheets Integration</h3>
+                                <p class="text-sm text-gray-400 mt-1">Connect the system to a cloud spreadsheet for permanent backup.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex flex-col gap-3">
+                            <label class="text-[10px] text-gray-500 font-bold uppercase tracking-widest ml-1">Apps Script Web App URL</label>
+                            <input type="text" id="webhook-url" class="w-full bg-black/60 border border-gray-700 rounded-xl py-4 px-5 text-white focus:border-cbce-green font-mono text-sm outline-none transition-colors" placeholder="https://script.google.com/macros/s/.../exec">
+                            <button onclick="app.saveWebhook()" class="bg-cbce-green hover:bg-cbce-dark text-white px-8 py-3.5 rounded-xl font-bold transition-all shadow-lg mt-3 w-full md:w-auto self-start text-sm">
+                                Save Connection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 3: FULLSCREEN SCANNER TERMINAL
+         ========================================== -->
+    <div id="view-sender-camera" class="hidden w-full h-full relative bg-black">
+        <div id="video-container">
+            <video id="webcam" autoplay muted playsinline></video>
+            <canvas id="overlay"></canvas>
+            
+            <div id="ar-scanner-ui" class="ar-scanner-box active">
+                <div class="ar-corner ar-tl"></div><div class="ar-corner ar-tr"></div>
+                <div class="ar-corner ar-bl"></div><div class="ar-corner ar-br"></div>
+                
+                <!-- 1-Second Hold Progress UI -->
+                <div id="scan-progress" class="scan-progress-container">
+                    <div id="scan-progress-bar" class="scan-progress-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top UI Header -->
+        <div class="absolute top-0 left-0 w-full p-6 flex justify-between items-start z-30 bg-gradient-to-b from-black/90 via-black/40 to-transparent">
+            <div class="flex items-center gap-4 glass-panel px-5 py-3 rounded-2xl shadow-lg border border-white/10">
+                <div class="w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-gray-700">
+                    <i class="ph ph-scan text-cbce-green text-2xl animate-pulse"></i>
+                </div>
+                <div>
+                    <span id="kiosk-branch-name" class="text-white font-bold tracking-tight text-lg leading-none block uppercase">BRANCH</span>
+                    <span id="sender-status" class="text-cbce-accent font-bold uppercase tracking-widest text-[9px] mt-1 block">Starting Camera...</span>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="app.switchCamera()" class="bg-black/60 p-3.5 rounded-xl text-white backdrop-blur border border-gray-700 hover:bg-gray-800 transition-colors shadow-lg">
+                    <i class="ph ph-camera-rotate text-xl"></i>
+                </button>
+                <button onclick="app.logout()" class="bg-red-950/60 p-3.5 rounded-xl text-red-400 backdrop-blur border border-red-900 hover:bg-red-900/80 transition-colors shadow-lg" title="Exit Kiosk">
+                    <i class="ph ph-power text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Center AI Guidance Text -->
+        <div class="absolute top-[20%] left-0 w-full text-center z-30 pointer-events-none">
+            <div id="ai-instruction" class="inline-block bg-black/80 backdrop-blur-xl text-white px-8 py-3 rounded-full border border-gray-600 text-lg font-bold tracking-wider transform transition-all scale-95 opacity-0 shadow-lg">
+                Please Look at Camera
+            </div>
+        </div>
+
+        <!-- Bottom Scan Result -->
+        <div class="absolute bottom-0 left-0 w-full p-6 lg:p-10 z-30 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col items-center">
+            
+            <div id="scan-result-card" class="w-full max-w-xl bg-black/90 backdrop-blur-2xl border border-gray-700 rounded-[2rem] p-6 transform translate-y-[150%] transition-transform duration-500 shadow-2xl">
+                <div class="flex items-center gap-6">
+                    <div id="scan-result-icon" class="w-20 h-20 rounded-2xl bg-cbce-green flex items-center justify-center text-white text-4xl shadow-inner border border-white/20 shrink-0">
+                        <i class="ph ph-check-circle"></i>
+                    </div>
+                    <div class="overflow-hidden">
+                        <h3 id="scan-result-name" class="text-3xl font-bold text-white tracking-tight truncate">Student Name</h3>
+                        <p id="scan-result-action" class="text-sm text-cbce-accent font-bold uppercase tracking-widest mt-1 truncate">Attendance Marked</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 px-4 py-1.5 bg-black/60 rounded-full border border-gray-800 text-[9px] text-gray-500 font-bold uppercase tracking-[0.2em]">
+                CBCE Face Recognition Terminal
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         MODALS
+         ========================================== -->
+    
+    <!-- Registration Modal -->
+    <div id="modal-register" class="fixed inset-0 bg-black/95 backdrop-blur-2xl z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl border border-gray-700 transform scale-95 opacity-0 transition-all duration-400" id="modal-register-content">
+            
+            <div class="flex items-start justify-between mb-8">
+                <div>
+                    <h3 class="text-3xl font-bold text-white tracking-tight">Register Face</h3>
+                    <p class="text-xs text-cbce-accent font-bold uppercase tracking-widest mt-1">Unknown Profile Detected</p>
+                </div>
+                <div class="w-20 h-20 rounded-2xl border-2 border-gray-600 bg-black overflow-hidden relative shadow-inner shrink-0">
+                    <img id="reg-face-preview" src="" class="w-full h-full object-cover">
+                </div>
+            </div>
+
+            <div class="flex bg-black/60 p-1.5 rounded-xl border border-gray-700 mb-6">
+                <button id="reg-type-student" onclick="ui.switchRegType('Student')" class="flex-1 py-3 text-xs font-bold uppercase tracking-wider rounded-lg bg-gray-800 text-white transition-all">Student</button>
+                <button id="reg-type-staff" onclick="ui.switchRegType('Teacher')" class="flex-1 py-3 text-xs font-bold uppercase tracking-wider rounded-lg text-gray-500 hover:text-white transition-all">Teacher / Staff</button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="input-group mt-0">
+                    <input type="text" id="reg-name" placeholder=" " autocomplete="off" required>
+                    <label>Full Name</label>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="input-group mt-0">
+                        <input type="text" id="reg-id" placeholder=" " autocomplete="off" required>
+                        <label id="lbl-reg-id">Roll Number</label>
+                    </div>
+                    <div class="input-group mt-0">
+                        <input type="text" id="reg-group" placeholder=" " autocomplete="off" required>
+                        <label id="lbl-reg-group">Course Name</label>
+                    </div>
+                </div>
+                
+                <div class="pt-6 space-y-3">
+                    <button onclick="app.submitRegistration()" class="w-full bg-cbce-green hover:bg-cbce-dark text-white font-bold uppercase tracking-widest py-4 rounded-xl transition-all shadow-lg text-sm">
+                        Save Profile & Mark Attendance
+                    </button>
+                    <button onclick="app.cancelRegistration()" class="w-full text-gray-500 hover:text-white text-xs font-bold uppercase tracking-widest py-3 rounded-xl hover:bg-white/5 transition-colors">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Generator Modal -->
+    <div id="modal-qr" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-sm rounded-[2rem] p-10 text-center border border-gray-700 shadow-2xl" id="modal-qr-content">
+            <h3 class="text-2xl font-bold text-white mb-1">ID Card QR</h3>
+            <p class="text-sm text-cbce-green font-mono font-bold mb-8" id="qr-modal-name">Name</p>
+            
+            <div class="bg-white p-5 rounded-2xl inline-block mx-auto mb-8 shadow-lg">
+                <div id="student-qr-render"></div>
+            </div>
+            
+            <div class="flex gap-4">
+                <button onclick="ui.closeQRModal()" class="flex-1 bg-black text-gray-400 py-3.5 rounded-xl hover:text-white border border-gray-800 transition-colors font-bold uppercase text-xs">Close</button>
+                <button onclick="app.downloadQR()" class="flex-1 bg-cbce-green text-white py-3.5 rounded-xl hover:bg-cbce-dark transition-colors font-bold uppercase text-xs flex items-center justify-center gap-2">
+                    <i class="ph ph-download-simple text-lg"></i> Download
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         JAVASCRIPT ENGINE v5.0 FINAL
+         ========================================== -->
+    <script>
+        // CONFIGURATION
+        const CONFIG = {
+            superAdmin: { user: 'cbceindia', pass: 'cbceindia123' },
+            branches: {
+                'cbcesilchar': { pass: 'cbcesilchar123', name: 'CBCE Silchar', id: 'SILCHAR' },
+                'cbcekailashahar': { pass: 'cbcekailashahar123', name: 'CBCE Kailashahar', id: 'KAILA' }
+            },
+            modelsUrl: 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/', 
+            matchThreshold: 0.50, 
+            cooldownMs: 60000,    // 1 minute spam protection
+            minDurationMs: 60000, // 1 minute inside before departure allowed
+            faceHoldMs: 1000      // 1 full second hold required for stable capture
+        };
+
+        const state = {
+            authType: null, // 'admin', 'branch_dash', 'branch_scan'
+            branchName: 'All', 
+            branchId: 'ALL',
+            dashboardFilter: 'All', 
+            facesDB: [], 
+            attendanceLogs: [], 
+            activeSessions: {}, 
+            
+            // Camera & AI State
+            isModelLoaded: false, isVideoPlaying: false, facingMode: 'user',
+            currentFaceData: null, currentFaceImage: null, 
+            recentScans: {}, isRegistering: false, regType: 'Student',
+            
+            // Hold Logic State
+            holdStart: 0, holdingFaceId: null, holdingAllowed: false,
+            
+            // P2P State
+            peer: null, connections: [], networkPeers: []
+        };
+
+        // Audio Subsystem
+        const audio = {
+            ctx: null,
+            init() { if (!this.ctx) { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } },
+            play(type = 'success') {
+                if(!this.ctx) return;
+                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                if (type === 'success') {
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(800, this.ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime); osc.start(); osc.stop(this.ctx.currentTime + 0.15);
+                } else if (type === 'error') {
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(300, this.ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime); osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+                }
+            }
+        };
+
+        // IndexedDB Persistence
+        const db = {
+            dbName: 'CBCE_V5_FINAL', storeName: 'identities', logStore: 'logs',
+            init() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, 1);
+                    request.onupgradeneeded = (e) => {
+                        const idb = e.target.result;
+                        if (!idb.objectStoreNames.contains(this.storeName)) idb.createObjectStore(this.storeName, { keyPath: 'idNumber' });
+                        if (!idb.objectStoreNames.contains(this.logStore)) idb.createObjectStore(this.logStore, { keyPath: 'timestamp' });
+                    };
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            },
+            async getAll(store = this.storeName) {
+                const idb = await this.init();
+                return new Promise((resolve) => {
+                    const tx = idb.transaction(store, 'readonly');
+                    const req = tx.objectStore(store).getAll();
+                    req.onsuccess = () => resolve(req.result);
+                });
+            },
+            async save(data, store = this.storeName) {
+                const idb = await this.init();
+                return new Promise((resolve) => {
+                    const tx = idb.transaction(store, 'readwrite');
+                    tx.objectStore(store).put(data);
+                    tx.oncomplete = () => resolve(true);
+                });
+            },
+            async delete(key, store = this.storeName) {
+                const idb = await this.init();
+                return new Promise((resolve) => {
+                    const tx = idb.transaction(store, 'readwrite');
+                    tx.objectStore(store).delete(key);
+                    tx.oncomplete = () => resolve(true);
+                });
+            }
+        };
+
+        // P2P Synchronizer (Month-Based Deterministic Network)
+        const p2p = {
+            getNetworkCode() {
+                const d = new Date(); return `${String(d.getMonth()+1).padStart(2,'0')}${d.getFullYear()}`;
+            },
+            initDashboard(role, branchId) {
+                const netCode = this.getNetworkCode();
+                let myId = `CBCE-DASH-${role.toUpperCase()}-${netCode}`;
+                if(role === 'branch') myId = `CBCE-DASH-${branchId}-${netCode}`;
+                
+                state.peer = new Peer(myId);
+                state.peer.on('open', (id) => {
+                    document.getElementById('network-sync-status').innerHTML = `<i class="ph ph-plugs-connected text-cbce-green"></i> System Synced`;
+                    document.getElementById('network-sync-status').classList.replace('text-gray-300', 'text-cbce-green');
+                });
+                
+                state.peer.on('connection', (conn) => {
+                    state.connections.push(conn);
+                    conn.on('data', (payload) => {
+                        if(payload.type === 'ATTENDANCE_LOG') app.processDashboardLog(payload.data);
+                        if(payload.type === 'NEW_REGISTRATION') app.processRegistrationSync(payload.data);
+                    });
+                });
+                state.peer.on('error', (err) => {
+                    if(err.type === 'unavailable-id') {
+                        // Dashboard already open elsewhere, that's fine. We still listen via DB changes if possible.
+                    }
+                });
+            },
+            initScanner(branchId) {
+                state.peer = new Peer(); // Random ID for scanner
+                const netCode = this.getNetworkCode();
+                const targetAdmin = `CBCE-DASH-ADMIN-${netCode}`;
+                const targetBranch = `CBCE-DASH-${branchId}-${netCode}`;
+                
+                state.peer.on('open', () => {
+                    this.connectTo(targetAdmin);
+                    this.connectTo(targetBranch);
+                    // Auto reconnect loop
+                    setInterval(() => {
+                        if(!state.connections.find(c => c.peer === targetAdmin && c.open)) this.connectTo(targetAdmin);
+                        if(!state.connections.find(c => c.peer === targetBranch && c.open)) this.connectTo(targetBranch);
+                    }, 5000);
+                });
+            },
+            connectTo(targetId) {
+                const conn = state.peer.connect(targetId);
+                conn.on('open', () => { state.connections.push(conn); });
+                conn.on('close', () => { state.connections = state.connections.filter(c => c.peer !== targetId); });
+            },
+            broadcast(type, data) {
+                state.connections.forEach(conn => {
+                    if(conn.open) conn.send({type, data});
+                });
+            }
+        };
+
+        // UI Manipulation
+        const ui = {
+            showView(viewId) {
+                ['view-login', 'view-dashboard', 'view-sender-camera'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (id === viewId) { el.classList.remove('hidden'); el.classList.add('fade-enter-active'); }
+                    else { el.classList.add('hidden'); el.classList.remove('fade-enter-active'); }
+                });
+            },
+            switchTab(tabId) {
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('.tab-btn').forEach(el => {
+                    el.classList.remove('bg-cbce-green/20', 'text-white', 'border-cbce-green/40');
+                    el.classList.add('text-gray-400');
+                    el.querySelector('i').classList.remove('text-cbce-green');
+                });
+                document.getElementById(tabId).classList.remove('hidden');
+                const btn = document.querySelector(`.tab-btn[data-target="${tabId}"]`);
+                if(btn) {
+                    btn.classList.add('bg-cbce-green/20', 'text-white', 'border-cbce-green/40');
+                    btn.classList.remove('text-gray-400');
+                    btn.querySelector('i').classList.add('text-cbce-green');
+                }
+            },
+            filterBranch(branch) {
+                state.dashboardFilter = branch;
+                document.querySelectorAll('.branch-filter-btn').forEach(btn => {
+                    if(btn.dataset.branch === branch) btn.className = "px-4 py-1.5 text-xs font-bold uppercase rounded-md bg-cbce-dark text-white branch-filter-btn";
+                    else btn.className = "px-4 py-1.5 text-xs font-bold uppercase rounded-md text-gray-500 hover:text-white branch-filter-btn transition-colors";
+                });
+                app.renderDashboardLogs();
+            },
+            filterVault() {
+                const q = document.getElementById('search-vault').value.toLowerCase();
+                const cards = document.querySelectorAll('.vault-card');
+                cards.forEach(c => { c.style.display = c.innerText.toLowerCase().includes(q) ? 'block' : 'none'; });
+            },
+            toast(msg, type = 'info') {
+                const container = document.getElementById('toast-container'); const toast = document.createElement('div');
+                const colors = { success: 'bg-cbce-dark border-cbce-green', error: 'bg-[#2b0a0a] border-red-900', info: 'bg-black border-gray-800' };
+                const icons = { success: 'check-circle text-cbce-green', error: 'warning-circle text-red-500', info: 'info text-gray-400' };
+                toast.className = `flex items-center gap-4 px-5 py-4 rounded-2xl shadow-xl border ${colors[type]} text-white transform translate-x-full transition-all duration-300 font-medium z-[9999]`;
+                toast.innerHTML = `<i class="ph ph-${icons[type]} text-2xl"></i><span class="text-sm font-bold">${msg}</span>`;
+                container.appendChild(toast);
+                setTimeout(() => toast.classList.remove('translate-x-full'), 10);
+                setTimeout(() => { toast.classList.add('translate-x-full', 'opacity-0'); setTimeout(() => toast.remove(), 400); }, 3000);
+            },
+            togglePassword() {
+                const input = document.getElementById('login-pass'); const icon = document.getElementById('eye-icon');
+                if(input.type === 'password') { input.type = 'text'; icon.classList.replace('ph-eye', 'ph-eye-slash'); }
+                else { input.type = 'password'; icon.classList.replace('ph-eye-slash', 'ph-eye'); }
+            },
+            updateClock() {
+                setInterval(() => {
+                    const now = new Date();
+                    document.querySelectorAll('#live-clock').forEach(el => el.innerText = now.toLocaleTimeString('en-US'));
+                }, 1000);
+            },
+            setInstruction(text) {
+                const el = document.getElementById('ai-instruction');
+                if(text) { el.innerText = text; el.classList.remove('opacity-0', 'scale-95'); el.classList.add('opacity-100', 'scale-100'); }
+                else { el.classList.remove('opacity-100', 'scale-100'); el.classList.add('opacity-0', 'scale-95'); }
+            },
+            showScanProgress(percent) {
+                const container = document.getElementById('scan-progress');
+                const bar = document.getElementById('scan-progress-bar');
+                if(percent > 0) {
+                    container.classList.add('show');
+                    bar.style.width = percent + '%';
+                } else {
+                    container.classList.remove('show');
+                    bar.style.width = '0%';
+                }
+            },
+            showScanResult(name, action, success=true) {
+                const card = document.getElementById('scan-result-card');
+                document.getElementById('scan-result-name').innerText = name;
+                document.getElementById('scan-result-action').innerText = action;
+                const icon = document.getElementById('scan-result-icon');
+                if(success) { icon.className = "w-20 h-20 rounded-2xl bg-cbce-green flex items-center justify-center text-white text-4xl shadow-inner border border-white/20 shrink-0"; icon.innerHTML = '<i class="ph ph-check-circle"></i>'; audio.play('success'); }
+                else { icon.className = "w-20 h-20 rounded-2xl bg-red-600 flex items-center justify-center text-white text-4xl shadow-inner border border-white/20 shrink-0"; icon.innerHTML = '<i class="ph ph-warning-circle"></i>'; audio.play('error'); }
+                card.classList.remove('translate-y-[150%]');
+                setTimeout(() => card.classList.add('translate-y-[150%]'), 3000);
+            },
+            toggleFullscreen() {
+                if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+                else if (document.exitFullscreen) document.exitFullscreen();
+            },
+            switchRegType(type) {
+                state.regType = type;
+                const btnStu = document.getElementById('reg-type-student'); const btnStaff = document.getElementById('reg-type-staff');
+                const lblId = document.getElementById('lbl-reg-id'); const lblGroup = document.getElementById('lbl-reg-group');
+                if(type === 'Student') {
+                    btnStu.className = "flex-1 py-3 text-xs font-bold uppercase tracking-wider rounded-lg bg-gray-800 text-white transition-all";
+                    btnStaff.className = "flex-1 py-3 text-xs font-bold uppercase tracking-wider rounded-lg text-gray-500 hover:text-white transition-all";
+                    lblId.innerText = "Roll Number"; lblGroup.innerText = "Course Name";
+                } else {
+                    btnStaff.className = "flex-1 py-3 text-xs font-bold uppercase tracking-wider rounded-lg bg-gray-800 text-white transition-all";
+                    btnStu.className = "flex-1 py-3 text-xs font-bold uppercase tracking-wider rounded-lg text-gray-500 hover:text-white transition-all";
+                    lblId.innerText = "Employee Code"; lblGroup.innerText = "Department/Role";
+                }
+            },
+            showQRModal(idNumber, name) {
+                const person = state.facesDB.find(s => s.idNumber === idNumber); if(!person) return;
+                document.getElementById('qr-modal-name').innerText = `${name} (${person.studentId})`;
+                document.getElementById('student-qr-render').innerHTML = '';
+                new QRCode(document.getElementById("student-qr-render"), { text: person.qrData, width: 200, height: 200, colorDark: "#000", colorLight: "#fff" });
+                document.getElementById('modal-qr').classList.remove('hidden'); document.getElementById('modal-qr-content').dataset.id = idNumber;
+            },
+            closeQRModal() { document.getElementById('modal-qr').classList.add('hidden'); },
+            triggerLiveComparison(storedImg, liveImg, name, role, status, branch) {
+                const panel = document.getElementById('live-comparison-panel');
+                document.getElementById('compare-stored-img').src = storedImg || '';
+                document.getElementById('compare-live-img').src = liveImg || '';
+                document.getElementById('compare-name').innerText = name;
+                document.getElementById('compare-role').innerText = role;
+                document.getElementById('compare-status').innerText = status;
+                document.getElementById('compare-time').innerText = new Date().toLocaleTimeString('en-US');
+                document.getElementById('compare-branch-badge').innerText = branch.toUpperCase();
+                
+                panel.classList.remove('hidden');
+                panel.classList.remove('animate-pop'); void panel.offsetWidth; panel.classList.add('animate-pop');
+            }
+        };
+
+        // Cloud Polling & Webhook
+        const sync = {
+            async pushSheet(data) {
+                const url = localStorage.getItem('cbce_webhook');
+                if(!url) return;
+                try { await fetch(url, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); } 
+                catch(e) { console.error('Sheet sync failed'); }
+            }
+        };
+
+        // Main Application Controller
+        const app = {
+            init() {
+                document.getElementById('login-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const u = document.getElementById('login-user').value.toLowerCase(); 
+                    const p = document.getElementById('login-pass').value;
+                    const roleSelect = document.querySelector('input[name="loginRole"]:checked').value; // 'dashboard' or 'scanner'
+
+                    // Super Admin Authentication
+                    if (u === CONFIG.superAdmin.user && p === CONFIG.superAdmin.pass) {
+                        state.authType = 'admin'; state.branchName = 'Global'; state.branchId = 'ALL';
+                        ui.toast('Super Admin Login Success', 'success'); audio.init();
+                        this.initDashboard();
+                    } 
+                    // Branch Authentication
+                    else if (CONFIG.branches[u] && p === CONFIG.branches[u].pass) {
+                        state.branchName = CONFIG.branches[u].name; state.branchId = CONFIG.branches[u].id;
+                        
+                        if(roleSelect === 'dashboard') {
+                            state.authType = 'branch_dash'; state.dashboardFilter = state.branchName;
+                            ui.toast(`${state.branchName} Panel Active`, 'success'); audio.init();
+                            this.initDashboard();
+                        } else {
+                            state.authType = 'branch_scan';
+                            ui.toast(`${state.branchName} Scanner Active`, 'success'); audio.init();
+                            this.initScanner();
+                        }
+                    } else {
+                        ui.toast('Invalid Credentials', 'error'); audio.play('error');
+                    }
+                });
+
+                ui.updateClock(); this.loadLocalData(); 
+            },
+
+            logout() {
+                ui.showView('view-login'); ui.toast('Session Logged Out', 'info');
+                if(state.peer) state.peer.destroy();
+                setTimeout(() => location.reload(), 800);
+            },
+
+            async loadLocalData() {
+                try {
+                    const savedWebhook = localStorage.getItem('cbce_webhook'); if(savedWebhook) document.getElementById('webhook-url').value = savedWebhook;
+                    const savedSessions = localStorage.getItem('cbce_sessions'); if(savedSessions) state.activeSessions = JSON.parse(savedSessions);
+
+                    const dbFaces = await db.getAll(db.storeName);
+                    state.facesDB = dbFaces.map(f => ({ ...f, descriptor: f.descriptor ? new Float32Array(f.descriptor) : null }));
+                    
+                    const dbLogs = await db.getAll(db.logStore);
+                    state.attendanceLogs = dbLogs.sort((a,b) => b.timestamp - a.timestamp);
+                } catch(e) { console.error(e); }
+            },
+
+            saveWebhook() {
+                const url = document.getElementById('webhook-url').value;
+                if(url.startsWith('https://script.google.com/')) { localStorage.setItem('cbce_webhook', url); ui.toast('Cloud Connected', 'success'); } 
+                else ui.toast('Invalid Google Script URL', 'error');
+            },
+
+            // ------------------ DASHBOARD ENGINE ------------------
+            initDashboard() {
+                ui.showView('view-dashboard');
+                
+                if(state.authType === 'admin') {
+                    document.getElementById('nav-admin-tools').classList.remove('hidden');
+                    document.getElementById('admin-branch-filter').classList.remove('hidden');
+                    document.getElementById('admin-branch-filter').classList.add('flex');
+                    document.getElementById('sidebar-role').innerText = 'Global Master Control';
+                    p2p.initDashboard('admin', 'ALL');
+                } else {
+                    document.getElementById('sidebar-title').innerText = state.branchName;
+                    document.getElementById('sidebar-role').innerText = 'Branch Panel';
+                    p2p.initDashboard('branch', state.branchId);
+                }
+                
+                this.updateVaultGrid();
+                this.renderDashboardLogs();
+            },
+
+            updateVaultGrid() {
+                const grid = document.getElementById('students-grid'); if(!grid) return; grid.innerHTML = '';
+                
+                let filteredDB = state.facesDB;
+                if(state.authType !== 'admin') {
+                    filteredDB = filteredDB.filter(f => f.branch === state.branchName);
+                }
+
+                if(filteredDB.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-10"><i class="ph ph-address-book text-4xl mb-2"></i><p>No profiles found</p></div>'; return; }
+                
+                filteredDB.forEach(s => {
+                    const badgeColor = s.userType === 'Teacher' ? 'bg-purple-900/40 text-purple-400 border-purple-800' : 'bg-blue-900/40 text-blue-400 border-blue-800';
+                    const imgHtml = s.image ? `<img src="${s.image}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-2xl font-bold bg-gray-800">${s.name.charAt(0)}</div>`;
+                    
+                    grid.innerHTML += `
+                        <div class="vault-card bg-black/40 p-5 rounded-2xl border border-gray-800 shadow-sm relative group hover:border-gray-600 transition-colors">
+                            <span class="absolute top-4 right-4 px-2 py-0.5 text-[9px] uppercase font-bold rounded border ${badgeColor}">${s.userType}</span>
+                            <div class="flex items-center gap-4 mt-1">
+                                <div class="w-16 h-16 rounded-xl overflow-hidden border-2 border-gray-700 bg-black shrink-0">${imgHtml}</div>
+                                <div class="overflow-hidden">
+                                    <h4 class="font-bold text-white text-base truncate">${s.name}</h4>
+                                    <p class="text-[10px] text-cbce-green font-mono font-bold truncate">${s.idNumber}</p>
+                                    <p class="text-[9px] text-gray-500 mt-1 uppercase font-bold truncate">${s.groupInfo}</p>
+                                    ${state.authType === 'admin' ? `<p class="text-[9px] text-gray-600 mt-1 uppercase">${s.branch}</p>` : ''}
+                                </div>
+                            </div>
+                            <div class="mt-4 flex gap-2 pt-4 border-t border-gray-800/80">
+                                <button onclick="ui.showQRModal('${s.idNumber}', '${s.name}')" class="flex-1 text-[10px] py-2 font-bold uppercase bg-gray-900 rounded-lg text-white hover:bg-gray-800 transition border border-gray-700">ID Card QR</button>
+                            </div>
+                        </div>`;
+                });
+            },
+
+            processDashboardLog(logData) {
+                state.attendanceLogs.unshift(logData);
+                db.save(logData, db.logStore);
+                this.renderDashboardLogs();
+
+                // Only push to sheet if Master Admin (prevents duplicate rows if branch is also open)
+                if(state.authType === 'admin') sync.pushSheet(logData);
+
+                if(state.dashboardFilter === 'All' || state.dashboardFilter === logData.branch) {
+                    const person = state.facesDB.find(s => s.idNumber === logData.idNumber);
+                    if(person && logData.liveImage) {
+                        ui.triggerLiveComparison(person.image, logData.liveImage, person.name, `${person.userType} • ${person.idNumber}`, logData.type, logData.branch);
+                    }
+                }
+            },
+            
+            processRegistrationSync(person) {
+                const processed = { ...person, descriptor: new Float32Array(person.descriptor) };
+                db.save({ ...processed, descriptor: Array.from(processed.descriptor) });
+                state.facesDB.push(processed);
+                this.updateVaultGrid();
+            },
+
+            renderDashboardLogs() {
+                const tbody = document.getElementById('live-table-body');
+                tbody.innerHTML = '';
+                
+                let filteredLogs = state.attendanceLogs;
+                // Admin filter
+                if(state.authType === 'admin' && state.dashboardFilter !== 'All') {
+                    filteredLogs = filteredLogs.filter(l => l.branch === state.dashboardFilter);
+                }
+                // Branch filter
+                if(state.authType === 'branch_dash') {
+                    filteredLogs = filteredLogs.filter(l => l.branch === state.branchName);
+                }
+
+                document.getElementById('log-count').innerText = `${filteredLogs.length} Records Found`;
+                
+                // Stats
+                let usersForBranch = state.facesDB.length;
+                if(state.authType === 'branch_dash') usersForBranch = state.facesDB.filter(f => f.branch === state.branchName).length;
+                else if (state.dashboardFilter !== 'All') usersForBranch = state.facesDB.filter(f => f.branch === state.dashboardFilter).length;
+                
+                document.getElementById('stat-total-users').innerText = usersForBranch;
+                
+                let presentCnt=0, todayLogs=0;
+                const today = new Date().toLocaleDateString('en-GB');
+                const activeMap = {};
+                
+                filteredLogs.forEach(data => {
+                    const logDate = new Date(data.timestamp).toLocaleDateString('en-GB');
+                    if(logDate === today) {
+                        todayLogs++;
+                        if(!activeMap[data.idNumber]) activeMap[data.idNumber] = data.type; 
+                    }
+                });
+                
+                for(let key in activeMap) { if(activeMap[key] === 'Arrival') presentCnt++; }
+                
+                document.getElementById('stat-present').innerText = presentCnt;
+                document.getElementById('stat-logs-today').innerText = todayLogs;
+
+                if(filteredLogs.length === 0) {
+                    tbody.innerHTML = '<tr id="empty-log-row"><td colspan="4" class="px-8 py-16 text-center text-gray-600 font-medium border-b border-transparent">No attendance records found.</td></tr>';
+                    return;
+                }
+
+                filteredLogs.slice(0, 50).forEach((data, index) => {
+                    const tr = document.createElement('tr');
+                    tr.className = `hover:bg-white/5 transition-colors group ${index === 0 ? 'new-entry' : ''}`;
+                    
+                    const typeColor = data.type === 'Arrival' ? 'text-green-400' : 'text-orange-400';
+                    const typeIcon = data.type === 'Arrival' ? 'arrow-down-left' : 'arrow-up-right';
+                    const person = state.facesDB.find(s => s.idNumber === data.idNumber);
+                    const imgHtml = person && person.image ? `<img src="${person.image}" class="w-10 h-10 rounded-xl object-cover border border-gray-700 group-hover:border-cbce-green transition">` : `<div class="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center font-bold text-gray-400">${data.name.charAt(0)}</div>`;
+
+                    tr.innerHTML = `
+                        <td class="px-8 py-4">
+                            <div class="flex items-center gap-4">
+                                ${imgHtml}
+                                <div>
+                                    <div class="font-bold text-white text-base">${data.name}</div>
+                                    <div class="text-[10px] text-gray-500 font-mono font-bold mt-0.5">${data.userType} • ${data.idNumber}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="inline-block px-2 py-1 bg-gray-900 border border-gray-700 rounded text-[10px] font-bold uppercase text-gray-400">${data.branch}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="${typeColor} font-bold uppercase tracking-wider text-xs flex items-center gap-1.5"><i class="ph ph-${typeIcon} text-lg"></i> ${data.type}</div>
+                        </td>
+                        <td class="px-6 py-4 text-gray-400 font-mono text-sm">${new Date(data.timestamp).toLocaleString('en-US', {hour12: true, hour: 'numeric', minute: 'numeric', second: 'numeric', month: 'short', day: 'numeric'})}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            },
+
+            // ------------------ PDF EXPORT ENGINE ------------------
+            generatePDF(reportType) {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                
+                doc.setFillColor(76, 92, 45); 
+                doc.rect(0, 0, 210, 30, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(20);
+                doc.text("CBCE INSTITUTE", 14, 20);
+                
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "normal");
+                doc.text("Official Attendance Report", 145, 20);
+                
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(16);
+                doc.setFont("helvetica", "bold");
+                doc.text(reportType.toUpperCase(), 14, 45);
+                
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "normal");
+                doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 52);
+                const filterText = state.authType === 'admin' ? state.dashboardFilter : state.branchName;
+                doc.text(`Branch View: ${filterText.toUpperCase()}`, 14, 58);
+
+                let filteredLogs = state.attendanceLogs;
+                if(state.authType === 'branch_dash') filteredLogs = filteredLogs.filter(l => l.branch === state.branchName);
+                else if(state.dashboardFilter !== 'All') filteredLogs = filteredLogs.filter(l => l.branch === state.dashboardFilter);
+                
+                if(reportType === 'Active Campus Status Report') {
+                    const activeMap = {};
+                    filteredLogs.forEach(data => {
+                        const logDate = new Date(data.timestamp).toLocaleDateString('en-GB');
+                        if(logDate === new Date().toLocaleDateString('en-GB')) {
+                            if(!activeMap[data.idNumber]) activeMap[data.idNumber] = data;
+                        }
+                    });
+                    filteredLogs = Object.values(activeMap).filter(d => d.type === 'Arrival');
+                }
+
+                const tableData = filteredLogs.map(log => [
+                    log.name, log.idNumber, log.userType, log.branch.replace('CBCE ',''),
+                    log.type, new Date(log.timestamp).toLocaleTimeString(), new Date(log.timestamp).toLocaleDateString()
+                ]);
+
+                doc.autoTable({
+                    startY: 65,
+                    head: [['Name', 'ID Number', 'Role', 'Branch', 'Status', 'Time', 'Date']],
+                    body: tableData,
+                    theme: 'grid',
+                    headStyles: { fillColor: [76, 92, 45], textColor: [255,255,255] }, 
+                    styles: { fontSize: 8, font: 'helvetica' },
+                    alternateRowStyles: { fillColor: [245, 245, 245] }
+                });
+
+                const finalY = doc.lastAutoTable.finalY || 65;
+                if(finalY < 250) {
+                    doc.setFont("helvetica", "bold");
+                    doc.text("_______________________", 20, finalY + 30);
+                    doc.text("Authorized Signature", 20, finalY + 35);
+                }
+
+                doc.save(`CBCE_${reportType.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
+                ui.toast('PDF Export Completed', 'success');
+            },
+
+            exportCSV() {
+                const rows = ["Name,ID Number,Role,Branch,Status,Time,Date"];
+                let filteredLogs = state.attendanceLogs;
+                if(state.authType === 'branch_dash') filteredLogs = filteredLogs.filter(l => l.branch === state.branchName);
+                else if(state.dashboardFilter !== 'All') filteredLogs = filteredLogs.filter(l => l.branch === state.dashboardFilter);
+
+                filteredLogs.forEach(l => {
+                    const d = new Date(l.timestamp);
+                    rows.push(`"${l.name}","${l.idNumber}","${l.userType}","${l.branch}","${l.type}","${d.toLocaleTimeString()}","${d.toLocaleDateString()}"`);
+                });
+
+                const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+                const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob);
+                a.download = `CBCE_Data_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+            },
+
+            // ------------------ FULLSCREEN SCANNER TERMINAL ------------------
+            initScanner() {
+                document.documentElement.requestFullscreen().catch(()=>{}); // Auto fullscreen
+                ui.showView('view-sender-camera');
+                document.getElementById('kiosk-branch-name').innerText = state.branchName;
+                p2p.initScanner(state.branchId);
+                this.startSenderEngine();
+            },
+
+            async startSenderEngine() {
+                try {
+                    document.getElementById('sender-status').innerText = "Starting Camera & AI...";
+                    await faceapi.nets.tinyFaceDetector.loadFromUri(CONFIG.modelsUrl);
+                    await faceapi.nets.faceRecognitionNet.loadFromUri(CONFIG.modelsUrl);
+                    await faceapi.nets.faceLandmark68Net.loadFromUri(CONFIG.modelsUrl); 
+                    
+                    state.isModelLoaded = true;
+                    document.getElementById('sender-status').innerText = "Ready to Scan";
+                    this.startCamera();
+                } catch(e) { ui.toast('Camera AI Failure. Please reload.', 'error'); }
+            },
+
+            async startCamera() {
+                const video = document.getElementById('webcam');
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.facingMode, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+                    video.srcObject = stream;
+                    video.onloadedmetadata = () => { state.isVideoPlaying = true; this.processVideoFrame(); };
+                } catch(e) { ui.toast('Camera Offline. Check permissions.', 'error'); }
+            },
+
+            switchCamera() {
+                state.facingMode = state.facingMode === 'user' ? 'environment' : 'user';
+                const video = document.getElementById('webcam'); const canvas = document.getElementById('overlay');
+                if(state.facingMode === 'user') { video.style.transform = 'scaleX(-1)'; canvas.style.transform = 'scaleX(-1)'; }
+                else { video.style.transform = 'none'; canvas.style.transform = 'none'; }
+                if(video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+                this.startCamera();
+            },
+
+            captureSnapshot(video, box) {
+                const tmpC = document.createElement('canvas'); tmpC.width = 250; tmpC.height = 250;
+                const ctx = tmpC.getContext('2d');
+                const pad = box.width * 0.3; // Generous padding for good ID photo
+                const sx = Math.max(0, box.x - pad); const sy = Math.max(0, box.y - pad);
+                const sw = Math.min(video.videoWidth - sx, box.width + pad*2);
+                const sh = Math.min(video.videoHeight - sy, box.height + pad*2);
+
+                if(state.facingMode === 'user') { ctx.translate(250, 0); ctx.scale(-1, 1); } 
+                ctx.drawImage(video, sx, sy, sw, sh, 0, 0, 250, 250);
+                return tmpC.toDataURL('image/jpeg', 0.85); 
+            },
+
+            resetHold() {
+                state.holdStart = 0;
+                state.holdingAllowed = false;
+                ui.showScanProgress(0);
+            },
+
+            async processVideoFrame() {
+                if(!state.isVideoPlaying || state.isRegistering) {
+                    if(state.isRegistering) requestAnimationFrame(() => this.processVideoFrame());
+                    return;
+                }
+
+                const video = document.getElementById('webcam'); const canvas = document.getElementById('overlay');
+                const displaySize = { width: video.videoWidth, height: video.videoHeight };
+                if (canvas.width !== displaySize.width) faceapi.matchDimensions(canvas, displaySize);
+                const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if(state.isModelLoaded) {
+                    const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })).withFaceLandmarks().withFaceDescriptor();
+
+                    if (detection) {
+                        const resizedResult = faceapi.resizeResults(detection, displaySize);
+                        const box = resizedResult.detection.box;
+                        const ratio = (box.width * box.height) / (displaySize.width * displaySize.height);
+
+                        if (ratio < 0.05) { ui.setInstruction("Move Closer"); this.resetHold(); }
+                        else if (ratio > 0.6) { ui.setInstruction("Move Back"); this.resetHold(); }
+                        else {
+                            // Stable detection zone
+                            document.getElementById('ar-scanner-ui').classList.add('active');
+                            
+                            // Check match to verify cooldown before making them hold
+                            let isCooldown = false;
+                            if(state.facesDB.length > 0) {
+                                const labeledDesc = state.facesDB.filter(f => f.descriptor).map(f => new faceapi.LabeledFaceDescriptors(f.idNumber, [f.descriptor]));
+                                if(labeledDesc.length > 0) {
+                                    const matcher = new faceapi.FaceMatcher(labeledDesc, CONFIG.matchThreshold);
+                                    const match = matcher.findBestMatch(detection.descriptor);
+                                    if(match.label !== 'unknown') {
+                                        const now = Date.now();
+                                        if(state.recentScans[match.label] && (now - state.recentScans[match.label] < CONFIG.cooldownMs)) {
+                                            isCooldown = true;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if(isCooldown) {
+                                ui.setInstruction("Already Marked. Please wait.");
+                                this.resetHold();
+                            } else {
+                                // Initiate 1-Second Hold
+                                if(state.holdStart === 0) {
+                                    state.holdStart = Date.now();
+                                    ui.setInstruction("Hold Still...");
+                                    ui.showScanProgress(5);
+                                } else {
+                                    let elapsed = Date.now() - state.holdStart;
+                                    let progress = Math.min(100, (elapsed / CONFIG.faceHoldMs) * 100);
+                                    ui.showScanProgress(progress);
+                                    
+                                    if(elapsed >= CONFIG.faceHoldMs) {
+                                        ui.setInstruction("Processing...");
+                                        const snapshot = this.captureSnapshot(video, box);
+                                        await this.executeAttendanceLogic(detection.descriptor, snapshot);
+                                        this.resetHold();
+                                        document.getElementById('ar-scanner-ui').classList.remove('active');
+                                        await new Promise(r => setTimeout(r, 1500)); // Pause after success
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        ui.setInstruction("Please Look at Camera");
+                        document.getElementById('ar-scanner-ui').classList.remove('active');
+                        this.resetHold();
+                    }
+                }
+                
+                requestAnimationFrame(() => this.processVideoFrame());
+            },
+
+            async executeAttendanceLogic(descriptor, snapshotBase64) {
+                let bestMatch = null;
+                
+                if(state.facesDB.length > 0) {
+                    const labeledDesc = state.facesDB.filter(f => f.descriptor).map(f => new faceapi.LabeledFaceDescriptors(f.idNumber, [f.descriptor]));
+                    if(labeledDesc.length > 0) {
+                        const matcher = new faceapi.FaceMatcher(labeledDesc, CONFIG.matchThreshold);
+                        const match = matcher.findBestMatch(descriptor);
+                        if(match.label !== 'unknown') {
+                            bestMatch = state.facesDB.find(f => f.idNumber === match.label);
+                        }
+                    }
+                }
+
+                if (bestMatch) {
+                    state.recentScans[bestMatch.idNumber] = Date.now();
+                    this.pushAttendance(bestMatch, snapshotBase64);
+                    ui.showScanResult(bestMatch.name, `${bestMatch.userType} • Attendance Marked`, true);
+                } else {
+                    state.currentFaceData = descriptor; state.currentFaceImage = snapshotBase64;
+                    this.showRegistrationModal();
+                }
+            },
+
+            pushAttendance(person, liveImg) {
+                const logData = { 
+                    idNumber: person.idNumber, name: person.name, groupInfo: person.groupInfo, 
+                    studentId: person.studentId, userType: person.userType, mode: 'FACE', 
+                    branch: state.branchName, timestamp: Date.now(), liveImage: liveImg
+                };
+
+                const now = new Date(logData.timestamp); let type = "Arrival"; let durationStr = "-";
+                
+                if (state.activeSessions[person.idNumber]) {
+                    const arrivalTime = new Date(state.activeSessions[person.idNumber].time);
+                    const diffMs = now - arrivalTime;
+                    if (diffMs > CONFIG.minDurationMs) {
+                        type = "Departure";
+                        const hrs = Math.floor(diffMs / 3600000); const mins = Math.floor((diffMs % 3600000) / 60000);
+                        durationStr = `${hrs}h ${mins}m`; delete state.activeSessions[person.idNumber]; 
+                    } else return; 
+                } else state.activeSessions[person.idNumber] = { time: logData.timestamp, name: person.name };
+
+                localStorage.setItem('cbce_sessions', JSON.stringify(state.activeSessions));
+                logData.type = type;
+                logData.duration = durationStr;
+                logData.status = 'Confirmed';
+
+                // Save locally
+                state.attendanceLogs.unshift(logData);
+                db.save(logData, db.logStore);
+
+                // Broadcast P2P to Dashboards
+                p2p.broadcast('ATTENDANCE_LOG', logData);
+            },
+
+            // ------------------ REGISTRATION (KIOSK) ------------------
+            showRegistrationModal() {
+                state.isRegistering = true;
+                const modal = document.getElementById('modal-register'); const content = document.getElementById('modal-register-content');
+                document.getElementById('reg-face-preview').src = state.currentFaceImage;
+                
+                modal.classList.remove('hidden');
+                setTimeout(() => { content.classList.remove('opacity-0', 'scale-95'); content.classList.add('opacity-100', 'scale-100'); }, 10);
+                audio.play('success'); 
+            },
+
+            cancelRegistration() {
+                const modal = document.getElementById('modal-register'); const content = document.getElementById('modal-register-content');
+                content.classList.remove('opacity-100', 'scale-100'); content.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => { modal.classList.add('hidden'); state.currentFaceData = null; state.currentFaceImage = null; state.isRegistering = false; }, 400);
+            },
+
+            submitRegistration() {
+                const name = document.getElementById('reg-name').value.trim();
+                const idNumber = document.getElementById('reg-id').value.trim();
+                const groupInfo = document.getElementById('reg-group').value.trim();
+
+                if(!name || !idNumber || !groupInfo) return ui.toast('Please fill all details', 'error');
+
+                const year = new Date().getFullYear(); const randomHash = Math.floor(1000 + Math.random() * 9000);
+                const prefix = state.regType === 'Student' ? 'STU' : 'EMP';
+                const studentId = `CBCE-${prefix}-${year}-${randomHash}`;
+                const qrData = `CBCE-QR-${idNumber}`;
+
+                const newPerson = { 
+                    name, idNumber, groupInfo, studentId, qrData, userType: state.regType, branch: state.branchName,
+                    descriptor: state.currentFaceData, image: state.currentFaceImage
+                };
+
+                const personToSave = { ...newPerson, descriptor: Array.from(newPerson.descriptor) };
+                
+                // Save locally
+                db.save(personToSave);
+                state.facesDB.push(newPerson);
+
+                // Broadcast P2P creation
+                p2p.broadcast('NEW_REGISTRATION', personToSave);
+                
+                // Log First Attendance
+                this.pushAttendance(newPerson, state.currentFaceImage); 
+                state.recentScans[idNumber] = Date.now();
+                
+                ui.showScanResult(name, "Profile Saved & Attendance Marked", true);
+                document.getElementById('reg-name').value = ''; document.getElementById('reg-id').value = ''; document.getElementById('reg-group').value = '';
+                this.cancelRegistration();
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
